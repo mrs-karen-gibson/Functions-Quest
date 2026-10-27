@@ -55,7 +55,7 @@ input,select{background:#0c1b43;border:1px solid #5284b8}
 <main class="wrap">
 <section id="home" class="panel"><div class="hero"><span class="mascot mascot-hero">🐊</span><span class="portal">🌀</span><span class="mascot mascot-hero">🤖</span></div><div class="eyebrow">9 WORLDS · 18 CHALLENGES · ONE CHAMPION</div><h1 class="glow-title">ENTER THE ARCADE ARENA</h1><p>Every student plays on their own iPad. Earn XP independently, help your assigned team climb the leaderboard, and conquer nine worlds!</p><div class="grid"><button onclick="show('teacherSetup')">👩‍🏫 Teacher / Host</button><button onclick="show('join')">🚀 Student Sign In</button></div><p class="small">For real-time syncing between iPads, connect the included Google Apps Script. Local demo mode is available for testing on one device.</p></section>
 <section id="teacherSetup" class="panel hidden"><h2>Teacher command center</h2><p>Paste your deployed Google Apps Script Web App URL. See SETUP.txt for the one-time setup.</p><label>Web App URL</label><input id="api" placeholder="https://script.google.com/macros/s/.../exec"><div class="row" style="margin-top:14px"><button onclick="saveApi()">Save connection</button><button class="secondary" onclick="startDemo()">Try local demo</button></div><label>Game room code (4–8 letters/numbers)</label><input id="newRoom" value="GATOR3" maxlength="8"><label>Teacher PIN (4+ digits)</label><input id="pin" type="password" placeholder="Choose a PIN"><button style="margin-top:14px" onclick="createRoom()">Create / open game</button><p id="setupMsg"></p></section>
-<section id="join" class="panel hidden"><h2>🚀 Student arcade sign-in</h2><p>Enter your <b>four-digit personal PIN</b> from your Function Quest card. Your class, name, team, and character will load automatically!</p><label for="studentPass">Your four-digit PIN</label><input id="studentPass" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="4-digit PIN" autocomplete="off" aria-describedby="joinMsg"><button id="studentSignInBtn" style="margin-top:15px" onclick="signInStudent()">⚡ Start my quest</button><p id="joinMsg" aria-live="polite" style="min-height:1.5em;font-weight:700"></p><p class="small" id="joinVersion">One-PIN sign-in • Oct 27</p></section>
+<section id="join" class="panel hidden"><h2>🚀 Student arcade sign-in</h2><p>Enter your <b>four-digit personal PIN</b> from your Function Quest card. Your class, name, team, and character will load automatically!</p><label for="studentPass">Your four-digit PIN</label><input id="studentPass" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="4-digit PIN" autocomplete="off" aria-describedby="joinMsg"><button id="studentSignInBtn" style="margin-top:15px" onclick="signInStudent()">⚡ Start my quest</button><p id="joinMsg" aria-live="polite" style="min-height:1.5em;font-weight:700"></p><p class="small" id="joinVersion">One-PIN sign-in • Diagnostic fix Oct 27</p></section>
 <section id="teacher" class="hidden"><div class="panel"><div class="top"><h2>🏆 LIVE LEADERBOARD</h2><div><span class="pill">ROOM <b id="roomLabel"></b></span> <button class="secondary" onclick="refresh()">Refresh</button></div></div><p class="small">Project this screen during class. Rankings use <b>average accuracy per participating student</b> so teams of different sizes compete fairly. Student names and codes are hidden from this public leaderboard.</p><div class="arena"><div class="race-track" id="raceTrack"></div><div id="leaderboard"></div></div></div>
 <div class="panel"><div class="top"><h3>🔒 Teacher team setup — prepare before class</h3><button class="secondary" onclick="toggleRoster()" id="rosterToggle">Show teacher-only setup</button></div><p class="small">Use your PIN-protected team roster privately, before projecting the leaderboard.</p><div id="rosterPanel" class="hidden"><div class="row"><div><label>How many teams?</label><select id="teamCount"><option value="2">2 teams</option><option value="3">3 teams</option><option value="4">4 teams</option><option value="5">5 teams</option><option value="6" selected>6 teams</option><option value="7">7 teams</option><option value="8">8 teams</option></select></div><div><label>Randomize names and characters</label><button onclick="prepareTeams()" id="prepareBtn">🎲 Generate teams</button></div></div><div class="notice rules">Generating teams replaces the current roster and personal codes, and is disabled once a student submits. Enter one student per line under their team, using first and last names. Your GATOR3, GATOR4, GATOR5, and GATOR6 rooms already contain your assigned teams and four-digit codes. Do not click Generate teams in those rooms.</div><div id="rosterCards" class="roster-grid"></div><div class="row" style="margin-top:14px"><button onclick="saveRoster()">💾 Save student assignments</button><button class="secondary" onclick="downloadRoster()">⬇ Download private student codes CSV</button><button class="secondary" onclick="printRoster()">🖨 Print student codes</button></div><div id="rosterMsg" class="small"></div></div></div>
 <div class="panel"><h3>Teacher controls</h3><p>Every student submits once per level on their own iPad. Each student has a personal score; team rankings use average accuracy. All individual problem results are recorded in Google Sheets.</p><button class="secondary" onclick="exportScores()">Download team scores CSV</button> <button class="secondary" onclick="toggleMonitor()" id="monitorToggle">Show private student progress</button><div id="monitorPanel" class="hidden" style="margin-top:14px"><h3>🔒 Individual student progress — teacher only</h3><p class="small">Use this privately to identify who needs help. Hide before projecting the leaderboard.</p><div id="monitorTable"></div></div> <button class="secondary" onclick="resetRoom()">Reset room (PIN required)</button><div id="teacherMsg"></div></div></section>
@@ -142,21 +142,28 @@ async function signInStudent(){
  msg.className='';
  msg.textContent='Finding your class and assigned team…';
  try{
-  // Search all four known rooms without revealing private rosters or PINs.
-  // allSettled permits one uncreated or unavailable room without blocking the rest.
-  const results=await Promise.allSettled(CLASS_ROOMS.map(async classRoom=>({
-   classRoom,
-   data:await request('join',{room:classRoom,pass:enteredPin})
-  })));
-  const matches=results.filter(r=>r.status==='fulfilled').map(r=>r.value);
-  if(matches.length===0){
-   const errors=results.filter(r=>r.status==='rejected').map(r=>String(r.reason?.message||r.reason));
-   const connectionIssue=errors.some(e=>/fetch|network|failed to fetch|unexpected token|html|connection|timeout/i.test(e));
-   throw Error(connectionIssue
-    ? 'Could not reach the game server. Check your internet connection and try again.'
-    : 'PIN not found. Check the four digits on your card or ask your teacher.');
+  // Sequential requests avoid competing for the Apps Script script-wide lock.
+  // Preserve real server errors instead of reporting every failure as an invalid PIN.
+  const matches=[];
+  const failures=[];
+  for(const classRoom of CLASS_ROOMS){
+   msg.textContent='Checking your assigned class…';
+   try{
+    const data=await request('join',{room:classRoom,pass:enteredPin});
+    if(!data?.student?.name||!data?.student?.team)throw Error('The server returned an incomplete student record');
+    matches.push({classRoom,data});
+   }catch(error){
+    failures.push({classRoom,message:String(error?.message||error)});
+   }
   }
-  if(matches.length>1)throw Error('This PIN matches more than one class. Please ask your teacher to check the assigned codes.');
+  if(matches.length===0){
+   const otherErrors=failures.filter(f=>!/PIN not found|Personal PIN not found|Teacher must create the room first|not unique in this room/i.test(f.message));
+   if(otherErrors.length){
+    throw Error('Sign-in server error ('+otherErrors.map(f=>f.classRoom+': '+f.message).join('; ')+'). Please show this message to your teacher.');
+   }
+   throw Error('No matching PIN in GATOR3, GATOR4, GATOR5 or GATOR6. Your teacher should check that the student sign-in and teacher dashboard use the same Apps Script deployment.');
+  }
+  if(matches.length>1)throw Error('This PIN matches more than one class. Ask your teacher to check the assigned codes.');
   const match=matches[0];
   room=match.classRoom;
   pass=enteredPin;
