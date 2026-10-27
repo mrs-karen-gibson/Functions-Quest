@@ -81,7 +81,8 @@ const originalSpecs=[
 ];
 
 const specs=originalSpecs.map(s=>s.slice(1));
-let api=localStorage.getItem('fq_api')||'',room='',team='',student='',pass='',teacherPin='',isTeacher=false,level=0,timer=null,lastState=null,privateRoster=null,myResults={};
+const FUNCTION_QUEST_WEB_APP_URL='https://script.google.com/macros/s/AKfycbyo46NjJBrITTkJImUsJ-nXUh9k55-RgDOF8iF03qxLcYqkWbDN83MoXwQRb_UwpZ4vtw/exec';
+let api=FUNCTION_QUEST_WEB_APP_URL,room='',team='',student='',pass='',teacherPin='',isTeacher=false,level=0,timer=null,lastState=null,privateRoster=null,myResults={};
 document.getElementById('api').value=api;
 function show(id){for(const e of document.querySelectorAll('main>section'))e.classList.add('hidden');document.getElementById(id).classList.remove('hidden');}
 function saveApi(){api=document.getElementById('api').value.trim();localStorage.setItem('fq_api',api);document.getElementById('setupMsg').textContent=api?'Connection saved. Create a room next.':'Local demo mode (no cross-device sync).';}
